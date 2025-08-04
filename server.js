@@ -10,9 +10,8 @@ const port = process.env.PORT || 3001;
 const app = express();
 
 // Controladores routes
-
 const authRoutes = require('./routes/authRoutes');
-
+const camionesRoutes = require('./routes/camionesRoutes'); // ✅ NUEVA RUTA AGREGADA
 
 // CORS configuration - Optimizado para VPS
 const allowedOrigins = [
@@ -56,8 +55,6 @@ const corsOptions = {
     optionsSuccessStatus: 200 // Para navegadores legacy
 };
 
-
-
 app.use(cors(corsOptions));
 app.use(cookieParser());    
 app.use(express.json({ limit: '10mb' })); // Límite para PDFs grandes
@@ -71,8 +68,6 @@ app.get('/health', async (req, res) => {
         const startTime = Date.now();
         await db.execute('SELECT 1');
         const dbResponseTime = Date.now() - startTime;
-        
-        
         
         res.json({
             status: '✅ VPS Healthy',
@@ -89,7 +84,6 @@ app.get('/health', async (req, res) => {
                 status: '✅ Connected',
                 responseTime: `${dbResponseTime}ms`
             },
-            
         });
     } catch (error) {
         res.status(500).json({
@@ -109,32 +103,22 @@ app.get('/health', async (req, res) => {
 // Root endpoint
 app.get('/', (req, res) => {
     res.json({
-        message: '🚀 API Distri-Back en VPS Hostinger',
+        message: '🚀 API Sistema de Fletes en VPS Hostinger',
         version: '1.0.0',
         environment: process.env.NODE_ENV || 'development',
         platform: 'VPS Hostinger',
         uptime: Math.floor(process.uptime()),
         endpoints: {
             auth: '/auth',
-            personas: '/personas',
-            productos: '/productos',
-            empleados: '/empleados',
-            pedidos: '/pedidos',
-            ventas: '/ventas',
-            finanzas: '/finanzas',
-            compras: '/compras',
-            auditoria: '/auditoria',
-            comprobantes: '/comprobantes',
+            camiones: '/camiones', // ✅ NUEVO ENDPOINT AGREGADO
             health: '/health',
-            
         }
     });
 });
 
 // Routes
-
 app.use('/auth', authRoutes);
-
+app.use('/camiones', camionesRoutes); // ✅ NUEVA RUTA AGREGADA
 
 // Middleware para rutas no encontradas
 app.use('*', (req, res) => {
@@ -146,12 +130,14 @@ app.use('*', (req, res) => {
         available_endpoints: [
             'GET /',
             'GET /health',
-            'GET /puppeteer-status',
             'POST /auth/login',
-            'GET /productos/buscar-producto',
-            'GET /pedidos/obtener-pedidos',
-            'POST /ventas/generarpdf-factura',
-            'POST /pedidos/generarpdf-notapedido'
+            'GET /auth/profile',
+            'GET /camiones', // ✅ NUEVO ENDPOINT EN DOCUMENTACIÓN
+            'POST /camiones',
+            'PUT /camiones/:id',
+            'DELETE /camiones/:id',
+            'GET /camiones/:camionId/mantenimientos',
+            'POST /camiones/:camionId/mantenimientos'
         ]
     });
 });
@@ -170,17 +156,11 @@ app.use((error, req, res, next) => {
     });
 });
 
-
-
-
-
 // Función para graceful shutdown en VPS
 const gracefulShutdown = async (signal) => {
     console.log(`🛑 Recibida señal ${signal}, cerrando servidor VPS...`);
     
     try {
-        
-        
         // Cerrar conexiones de base de datos
         const db = require('./controllers/dbPromise');
         await db.end();
@@ -223,4 +203,5 @@ const server = app.listen(port, '0.0.0.0', () => {
     console.log(`   - Plataforma: ${process.platform}`);
     console.log(`   - Arquitectura: ${process.arch}`);
     console.log(`   - PID: ${process.pid}`);
+    console.log(`   - 🚛 Módulo Camiones: ACTIVO`); // ✅ NUEVO LOG
 });
