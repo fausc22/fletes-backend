@@ -1,6 +1,6 @@
 // controllers/mantenimientosController.js - SISTEMA DE FLETES - CORREGIDO
 const pool = require('./dbPromise');
-const { createGastoFromMantenimiento } = require('./gastosController');
+const { createGastoFromMantenimiento } = require('./dineroController');
 
 // ✅ OBTENER MANTENIMIENTOS POR CAMIÓN
 exports.getMantenimientosByCamion = async (req, res) => {

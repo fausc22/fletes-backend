@@ -1,5 +1,6 @@
 // controllers/dineroController.js - SISTEMA DE FLETES
 const pool = require('./dbPromise');
+const db = require('./db');
 
 // ✅ CATEGORÍAS PREDEFINIDAS
 const CATEGORIAS_GASTOS = [
@@ -147,6 +148,7 @@ exports.createGasto = async (req, res) => {
 };
 
 // ✅ OBTENER GASTOS CON FILTROS
+
 exports.getGastos = async (req, res) => {
     try {
         const { 
@@ -160,61 +162,75 @@ exports.getGastos = async (req, res) => {
             año
         } = req.query;
         
-        let whereConditions = ['1=1'];
-        let params = [];
-        
-        // Filtros
-        if (camion_id) {
-            whereConditions.push('g.camion_id = ?');
-            params.push(camion_id);
-        }
-        
-        if (categoria_id) {
-            whereConditions.push('g.categoria_id = ?');
-            params.push(categoria_id);
-        }
-        
-        if (desde) {
-            whereConditions.push('g.fecha >= ?');
-            params.push(desde);
-        }
-        
-        if (hasta) {
-            whereConditions.push('g.fecha <= ?');
-            params.push(hasta);
-        }
-        
-        if (mes && año) {
-            whereConditions.push('YEAR(g.fecha) = ? AND MONTH(g.fecha) = ?');
-            params.push(año, mes);
-        }
-        
-        const whereClause = whereConditions.join(' AND ');
-        
-        const query = `
+        let query = `
             SELECT g.*, 
                    c.patente, c.marca, c.modelo,
                    cat.nombre as categoria_nombre
             FROM gastos g
             LEFT JOIN camiones c ON g.camion_id = c.id
             LEFT JOIN categorias cat ON g.categoria_id = cat.id
-            WHERE ${whereClause}
-            ORDER BY g.fecha DESC, g.fecha_creacion DESC
-            LIMIT ? OFFSET ?
+            WHERE 1=1
         `;
+        const params = [];
         
+        // Filtros opcionales (mismo código que ingresos, cambiando 'i' por 'g')
+        if (camion_id) {
+            query += ' AND g.camion_id = ?';
+            params.push(camion_id);
+        }
+        
+        if (categoria_id) {
+            query += ' AND g.categoria_id = ?';
+            params.push(categoria_id);
+        }
+        
+        if (desde) {
+            query += ' AND DATE(g.fecha) >= ?';
+            params.push(desde);
+        }
+        
+        if (hasta) {
+            query += ' AND DATE(g.fecha) <= ?';
+            params.push(hasta);
+        }
+        
+        if (mes && año) {
+            query += ' AND YEAR(g.fecha) = ? AND MONTH(g.fecha) = ?';
+            params.push(año, mes);
+        }
+        
+        query += ' ORDER BY g.fecha DESC, g.fecha_creacion DESC LIMIT ? OFFSET ?';
         params.push(parseInt(limit), parseInt(offset));
         
-        const [gastos] = await pool.execute(query, params);
+        // ✅ USAR db.execute
+        const [gastos] = await db.execute(query, params);
         
-        // Obtener total para paginación
-        const countQuery = `
-            SELECT COUNT(*) as total
-            FROM gastos g
-            WHERE ${whereClause}
-        `;
+        // Count query igual que ingresos pero con 'g'
+        let countQuery = `SELECT COUNT(*) as total FROM gastos g WHERE 1=1`;
+        const countParams = [];
         
-        const [totalResult] = await pool.execute(countQuery, params.slice(0, -2));
+        if (camion_id) {
+            countQuery += ' AND g.camion_id = ?';
+            countParams.push(camion_id);
+        }
+        if (categoria_id) {
+            countQuery += ' AND g.categoria_id = ?';
+            countParams.push(categoria_id);
+        }
+        if (desde) {
+            countQuery += ' AND DATE(g.fecha) >= ?';
+            countParams.push(desde);
+        }
+        if (hasta) {
+            countQuery += ' AND DATE(g.fecha) <= ?';
+            countParams.push(hasta);
+        }
+        if (mes && año) {
+            countQuery += ' AND YEAR(g.fecha) = ? AND MONTH(g.fecha) = ?';
+            countParams.push(año, mes);
+        }
+        
+        const [totalResult] = await db.execute(countQuery, countParams);
         
         console.log(`✅ Obtenidos ${gastos.length} gastos`);
         res.json({
@@ -356,6 +372,8 @@ exports.createIngreso = async (req, res) => {
 };
 
 // ✅ OBTENER INGRESOS CON FILTROS
+
+
 exports.getIngresos = async (req, res) => {
     try {
         const { 
@@ -369,61 +387,75 @@ exports.getIngresos = async (req, res) => {
             año
         } = req.query;
         
-        let whereConditions = ['1=1'];
-        let params = [];
-        
-        // Aplicar mismos filtros que gastos
-        if (camion_id) {
-            whereConditions.push('i.camion_id = ?');
-            params.push(camion_id);
-        }
-        
-        if (categoria_id) {
-            whereConditions.push('i.categoria_id = ?');
-            params.push(categoria_id);
-        }
-        
-        if (desde) {
-            whereConditions.push('i.fecha >= ?');
-            params.push(desde);
-        }
-        
-        if (hasta) {
-            whereConditions.push('i.fecha <= ?');
-            params.push(hasta);
-        }
-        
-        if (mes && año) {
-            whereConditions.push('YEAR(i.fecha) = ? AND MONTH(i.fecha) = ?');
-            params.push(año, mes);
-        }
-        
-        const whereClause = whereConditions.join(' AND ');
-        
-        const query = `
+        let query = `
             SELECT i.*, 
                    c.patente, c.marca, c.modelo,
                    cat.nombre as categoria_nombre
             FROM ingresos i
             LEFT JOIN camiones c ON i.camion_id = c.id
             LEFT JOIN categorias cat ON i.categoria_id = cat.id
-            WHERE ${whereClause}
-            ORDER BY i.fecha DESC, i.fecha_creacion DESC
-            LIMIT ? OFFSET ?
+            WHERE 1=1
         `;
+        const params = [];
         
+        // Filtros opcionales
+        if (camion_id) {
+            query += ' AND i.camion_id = ?';
+            params.push(camion_id);
+        }
+        
+        if (categoria_id) {
+            query += ' AND i.categoria_id = ?';
+            params.push(categoria_id);
+        }
+        
+        if (desde) {
+            query += ' AND DATE(i.fecha) >= ?';
+            params.push(desde);
+        }
+        
+        if (hasta) {
+            query += ' AND DATE(i.fecha) <= ?';
+            params.push(hasta);
+        }
+        
+        if (mes && año) {
+            query += ' AND YEAR(i.fecha) = ? AND MONTH(i.fecha) = ?';
+            params.push(año, mes);
+        }
+        
+        query += ' ORDER BY i.fecha DESC, i.fecha_creacion DESC LIMIT ? OFFSET ?';
         params.push(parseInt(limit), parseInt(offset));
         
-        const [ingresos] = await pool.execute(query, params);
+        // ✅ USAR db.execute que funciona mejor para estos casos
+        const [ingresos] = await db.execute(query, params);
         
         // Obtener total para paginación
-        const countQuery = `
-            SELECT COUNT(*) as total
-            FROM ingresos i
-            WHERE ${whereClause}
-        `;
+        let countQuery = `SELECT COUNT(*) as total FROM ingresos i WHERE 1=1`;
+        const countParams = [];
         
-        const [totalResult] = await pool.execute(countQuery, params.slice(0, -2));
+        if (camion_id) {
+            countQuery += ' AND i.camion_id = ?';
+            countParams.push(camion_id);
+        }
+        if (categoria_id) {
+            countQuery += ' AND i.categoria_id = ?';
+            countParams.push(categoria_id);
+        }
+        if (desde) {
+            countQuery += ' AND DATE(i.fecha) >= ?';
+            countParams.push(desde);
+        }
+        if (hasta) {
+            countQuery += ' AND DATE(i.fecha) <= ?';
+            countParams.push(hasta);
+        }
+        if (mes && año) {
+            countQuery += ' AND YEAR(i.fecha) = ? AND MONTH(i.fecha) = ?';
+            countParams.push(año, mes);
+        }
+        
+        const [totalResult] = await db.execute(countQuery, countParams);
         
         console.log(`✅ Obtenidos ${ingresos.length} ingresos`);
         res.json({
@@ -538,33 +570,38 @@ exports.getCategorias = async (req, res) => {
     }
 };
 
-// ✅ OBTENER MOVIMIENTOS UNIFICADOS
+
+
+// ✅ OBTENER MOVIMIENTOS UNIFICADOS 
 exports.getMovimientos = async (req, res) => {
     try {
-        const { limit = 20, offset = 0, camion_id, desde, hasta } = req.query;
+        const { limit = 10, offset = 0, camion_id, desde, hasta } = req.query;
         
-        let whereConditions = [];
+        // ✅ FIX: Hacer 2 consultas separadas y combinar en memoria
+        let whereConditions = ['1=1'];
         let params = [];
         
+        // Construir filtros
         if (camion_id) {
             whereConditions.push('camion_id = ?');
             params.push(camion_id);
         }
         
         if (desde) {
-            whereConditions.push('fecha >= ?');
+            whereConditions.push('DATE(fecha) >= ?');
             params.push(desde);
         }
         
         if (hasta) {
-            whereConditions.push('fecha <= ?');
+            whereConditions.push('DATE(fecha) <= ?');
             params.push(hasta);
         }
         
-        const whereClause = whereConditions.length > 0 ? 'WHERE ' + whereConditions.join(' AND ') : '';
+        const whereClause = whereConditions.join(' AND ');
         
-        const query = `
-            (SELECT 
+        // ✅ CONSULTA 1: INGRESOS
+        const queryIngresos = `
+            SELECT 
                 i.id, i.fecha, i.nombre, i.descripcion, i.total, 
                 'INGRESO' as tipo, i.camion_id, i.categoria_id,
                 c.patente, c.marca, c.modelo,
@@ -572,11 +609,13 @@ exports.getMovimientos = async (req, res) => {
             FROM ingresos i
             LEFT JOIN camiones c ON i.camion_id = c.id
             LEFT JOIN categorias cat ON i.categoria_id = cat.id
-            ${whereClause})
-            
-            UNION ALL
-            
-            (SELECT 
+            WHERE ${whereClause}
+            ORDER BY i.fecha DESC
+        `;
+        
+        // ✅ CONSULTA 2: GASTOS
+        const queryGastos = `
+            SELECT 
                 g.id, g.fecha, g.nombre, g.descripcion, g.total,
                 'GASTO' as tipo, g.camion_id, g.categoria_id,
                 c.patente, c.marca, c.modelo,
@@ -584,20 +623,46 @@ exports.getMovimientos = async (req, res) => {
             FROM gastos g
             LEFT JOIN camiones c ON g.camion_id = c.id
             LEFT JOIN categorias cat ON g.categoria_id = cat.id
-            ${whereClause})
-            
-            ORDER BY fecha DESC, id DESC
-            LIMIT ? OFFSET ?
+            WHERE ${whereClause}
+            ORDER BY g.fecha DESC
         `;
         
-        const queryParams = [...params, ...params, parseInt(limit), parseInt(offset)];
-        const [movimientos] = await pool.execute(query, queryParams);
+        console.log('🔍 Ejecutando 2 consultas separadas...');
+        console.log('🔍 Parámetros:', params);
         
-        console.log(`✅ Obtenidos ${movimientos.length} movimientos`);
+        // Ejecutar ambas consultas
+        const [ingresos] = await pool.execute(queryIngresos, params);
+        const [gastos] = await pool.execute(queryGastos, params);
+        
+        // ✅ COMBINAR EN MEMORIA
+        const todosMovimientos = [
+            ...ingresos.map(i => ({ ...i, tipo: 'INGRESO' })),
+            ...gastos.map(g => ({ ...g, tipo: 'GASTO' }))
+        ];
+        
+        // ✅ ORDENAR POR FECHA (más reciente primero)
+        todosMovimientos.sort((a, b) => {
+            const fechaA = new Date(a.fecha);
+            const fechaB = new Date(b.fecha);
+            if (fechaB.getTime() !== fechaA.getTime()) {
+                return fechaB.getTime() - fechaA.getTime(); // Más reciente primero
+            }
+            return b.id - a.id; // Si misma fecha, ID más alto primero
+        });
+        
+        // ✅ APLICAR PAGINACIÓN EN MEMORIA
+        const limitNum = parseInt(limit);
+        const offsetNum = parseInt(offset);
+        const movimientosPaginados = todosMovimientos.slice(offsetNum, offsetNum + limitNum);
+        
+        console.log(`✅ Obtenidos ${ingresos.length} ingresos + ${gastos.length} gastos = ${todosMovimientos.length} total`);
+        console.log(`✅ Paginación: mostrando ${movimientosPaginados.length} de ${todosMovimientos.length}`);
+        
         res.json({
-            movimientos,
-            limit: parseInt(limit),
-            offset: parseInt(offset)
+            movimientos: movimientosPaginados,
+            limit: limitNum,
+            offset: offsetNum,
+            total: todosMovimientos.length
         });
         
     } catch (error) {
@@ -903,5 +968,64 @@ exports.getEstadisticasGenerales = async (req, res) => {
             message: 'Error interno del servidor',
             error: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
+    }
+};
+
+exports.createGastoFromMantenimiento = async (mantenimientoData) => {
+    try {
+        const { 
+            camion_id, 
+            fecha, 
+            tipo, 
+            descripcion, 
+            costo, 
+            kilometraje 
+        } = mantenimientoData;
+        
+        // Solo crear gasto si hay costo
+        if (!costo || costo <= 0) {
+            return { success: false, message: 'No hay costo para registrar como gasto' };
+        }
+        
+        // Buscar categoría "Mantenimiento"
+        let [categoria] = await pool.execute(
+            'SELECT id FROM categorias WHERE nombre = "Mantenimiento" AND tipo = "GASTO"'
+        );
+        
+        if (categoria.length === 0) {
+            return { success: false, message: 'Categoría de Mantenimiento no encontrada' };
+        }
+        
+        const query = `
+            INSERT INTO gastos 
+            (fecha, nombre, descripcion, total, observaciones, camion_id, categoria_id, kilometraje_actual)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `;
+        
+        const [result] = await pool.execute(query, [
+            fecha,
+            `Mantenimiento - ${tipo}`,
+            descripcion || `Mantenimiento tipo ${tipo}`,
+            parseFloat(costo),
+            kilometraje ? `Kilometraje: ${kilometraje} km` : null,
+            camion_id,
+            categoria[0].id,
+            kilometraje || null
+        ]);
+        
+        console.log(`✅ Gasto creado automáticamente desde mantenimiento: ID ${result.insertId}`);
+        return { 
+            success: true, 
+            gastoId: result.insertId,
+            message: 'Gasto registrado automáticamente'
+        };
+        
+    } catch (error) {
+        console.error('❌ Error creando gasto desde mantenimiento:', error);
+        return { 
+            success: false, 
+            message: 'Error registrando gasto automático',
+            error: error.message 
+        };
     }
 };
