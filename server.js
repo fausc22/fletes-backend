@@ -11,7 +11,8 @@ const app = express();
 
 // Controladores routes
 const authRoutes = require('./routes/authRoutes');
-const camionesRoutes = require('./routes/camionesRoutes'); // ✅ NUEVA RUTA AGREGADA
+const camionesRoutes = require('./routes/camionesRoutes');
+const gastosRoutes = require('./routes/gastosRoutes'); // ✅ NUEVA RUTA AGREGADA
 
 // CORS configuration - Optimizado para VPS
 const allowedOrigins = [
@@ -110,7 +111,8 @@ app.get('/', (req, res) => {
         uptime: Math.floor(process.uptime()),
         endpoints: {
             auth: '/auth',
-            camiones: '/camiones', // ✅ NUEVO ENDPOINT AGREGADO
+            camiones: '/camiones',
+            gastos: '/gastos', // ✅ NUEVO ENDPOINT AGREGADO
             health: '/health',
         }
     });
@@ -118,7 +120,8 @@ app.get('/', (req, res) => {
 
 // Routes
 app.use('/auth', authRoutes);
-app.use('/camiones', camionesRoutes); // ✅ NUEVA RUTA AGREGADA
+app.use('/camiones', camionesRoutes);
+app.use('/gastos', gastosRoutes); // ✅ NUEVA RUTA AGREGADA
 
 // Middleware para rutas no encontradas
 app.use('*', (req, res) => {
@@ -132,12 +135,18 @@ app.use('*', (req, res) => {
             'GET /health',
             'POST /auth/login',
             'GET /auth/profile',
-            'GET /camiones', // ✅ NUEVO ENDPOINT EN DOCUMENTACIÓN
+            'GET /camiones',
             'POST /camiones',
             'PUT /camiones/:id',
             'DELETE /camiones/:id',
             'GET /camiones/:camionId/mantenimientos',
-            'POST /camiones/:camionId/mantenimientos'
+            'POST /camiones/:camionId/mantenimientos',
+            'GET /gastos', // ✅ NUEVO ENDPOINT EN DOCUMENTACIÓN
+            'POST /gastos',
+            'PUT /gastos/:id',
+            'DELETE /gastos/:id',
+            'GET /gastos/categorias',
+            'GET /gastos/estadisticas'
         ]
     });
 });
@@ -203,5 +212,7 @@ const server = app.listen(port, '0.0.0.0', () => {
     console.log(`   - Plataforma: ${process.platform}`);
     console.log(`   - Arquitectura: ${process.arch}`);
     console.log(`   - PID: ${process.pid}`);
-    console.log(`   - 🚛 Módulo Camiones: ACTIVO`); // ✅ NUEVO LOG
+    console.log(`   - 🚛 Módulo Camiones: ACTIVO`);
+    console.log(`   - 💰 Módulo Gastos: ACTIVO`); // ✅ NUEVO LOG
+    console.log(`   - 🔧 Módulo Mantenimientos: ACTIVO`); // ✅ NUEVO LOG
 });

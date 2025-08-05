@@ -1,5 +1,6 @@
-// controllers/mantenimientosController.js - SISTEMA DE FLETES
+// controllers/mantenimientosController.js - SISTEMA DE FLETES - CORREGIDO
 const pool = require('./dbPromise');
+const { createGastoFromMantenimiento } = require('./gastosController');
 
 // ✅ OBTENER MANTENIMIENTOS POR CAMIÓN
 exports.getMantenimientosByCamion = async (req, res) => {
@@ -25,10 +26,11 @@ exports.getMantenimientosByCamion = async (req, res) => {
             LIMIT ? OFFSET ?
         `;
         
+        // ✅ FIX: Convertir todos los parámetros numéricos a string para evitar el error
         const [mantenimientos] = await pool.execute(query, [
             camionId, 
-            parseInt(limit), 
-            parseInt(offset)
+            String(limit), 
+            String(offset)
         ]);
         
         // Obtener total para paginación
@@ -54,7 +56,7 @@ exports.getMantenimientosByCamion = async (req, res) => {
     }
 };
 
-// ✅ CREAR NUEVO MANTENIMIENTO
+// ✅ CREAR NUEVO MANTENIMIENTO CON INTEGRACIÓN DE GASTOS
 exports.createMantenimiento = async (req, res) => {
     try {
         const { camionId } = req.params;
@@ -65,7 +67,8 @@ exports.createMantenimiento = async (req, res) => {
             costo, 
             kilometraje, 
             proximo_service_km, 
-            observaciones 
+            observaciones,
+            crear_gasto = true  // ✅ NUEVO CAMPO: por defecto crear gasto
         } = req.body;
         
         // Validaciones básicas
@@ -99,58 +102,102 @@ exports.createMantenimiento = async (req, res) => {
             });
         }
         
-        const query = `
-            INSERT INTO mantenimientos 
-            (camion_id, fecha, tipo, descripcion, costo, kilometraje, proximo_service_km, observaciones)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        `;
-        
-        const [result] = await pool.execute(query, [
-            camionId,
-            fecha,
-            tipo.trim(),
-            descripcion?.trim() || null,
-            costo || null,
-            kilometraje || null,
-            proximo_service_km || null,
-            observaciones?.trim() || null
-        ]);
-        
-        // Actualizar último service y kilometraje del camión si corresponde
-        const updateFields = [];
-        const updateValues = [];
-        
-        if (kilometraje && kilometraje > camion[0].kilometros) {
-            updateFields.push('kilometros = ?');
-            updateValues.push(kilometraje);
-        }
-        
-        // Actualizar último service si es un service regular
-        const tiposService = ['SERVICE', 'MANTENIMIENTO PREVENTIVO', 'REVISION'];
-        if (tiposService.some(ts => tipo.toUpperCase().includes(ts.toUpperCase()))) {
-            updateFields.push('ultimo_service = ?');
-            updateValues.push(fecha);
-        }
-        
-        if (updateFields.length > 0) {
-            updateValues.push(camionId);
-            await pool.execute(
-                `UPDATE camiones SET ${updateFields.join(', ')} WHERE id = ?`,
-                updateValues
+        // ✅ USAR TRANSACCIÓN SIMPLE SIN CONEXIÓN MANUAL
+        try {
+            // 1. CREAR MANTENIMIENTO
+            const queryMantenimiento = `
+                INSERT INTO mantenimientos 
+                (camion_id, fecha, tipo, descripcion, costo, kilometraje, proximo_service_km, observaciones)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            `;
+            
+            const [resultMantenimiento] = await pool.execute(queryMantenimiento, [
+                camionId,
+                fecha,
+                tipo.trim(),
+                descripcion?.trim() || null,
+                costo || null,
+                kilometraje || null,
+                proximo_service_km || null,
+                observaciones?.trim() || null
+            ]);
+            
+            let gastoCreado = null;
+            
+            // 2. CREAR GASTO AUTOMÁTICAMENTE SI CORRESPONDE
+            if (crear_gasto && costo && costo > 0) {
+                const gastoResult = await createGastoFromMantenimiento({
+                    camion_id: camionId,
+                    fecha,
+                    tipo,
+                    descripcion,
+                    costo,
+                    kilometraje
+                });
+                
+                if (gastoResult.success) {
+                    gastoCreado = {
+                        id: gastoResult.gastoId,
+                        total: costo,
+                        mensaje: gastoResult.message
+                    };
+                    console.log(`✅ Gasto creado automáticamente: ID ${gastoResult.gastoId}`);
+                } else {
+                    console.log(`⚠️ No se pudo crear gasto automático: ${gastoResult.message}`);
+                }
+            }
+            
+            // 3. ACTUALIZAR ÚLTIMO SERVICE Y KILOMETRAJE DEL CAMIÓN SI CORRESPONDE
+            const updateFields = [];
+            const updateValues = [];
+            
+            if (kilometraje && kilometraje > camion[0].kilometros) {
+                updateFields.push('kilometros = ?');
+                updateValues.push(kilometraje);
+            }
+            
+            // Actualizar último service si es un service regular
+            const tiposService = ['SERVICE', 'MANTENIMIENTO PREVENTIVO', 'REVISION'];
+            if (tiposService.some(ts => tipo.toUpperCase().includes(ts.toUpperCase()))) {
+                updateFields.push('ultimo_service = ?');
+                updateValues.push(fecha);
+            }
+            
+            if (updateFields.length > 0) {
+                updateValues.push(camionId);
+                await pool.execute(
+                    `UPDATE camiones SET ${updateFields.join(', ')} WHERE id = ?`,
+                    updateValues
+                );
+            }
+            
+            // 4. OBTENER EL MANTENIMIENTO CREADO CON INFORMACIÓN COMPLETA
+            const [nuevoMantenimiento] = await pool.execute(
+                'SELECT * FROM mantenimientos WHERE id = ?', 
+                [resultMantenimiento.insertId]
             );
+            
+            console.log(`✅ Mantenimiento creado: ID ${resultMantenimiento.insertId} para camión ${camionId}`);
+            
+            const response = {
+                message: 'Mantenimiento registrado exitosamente',
+                mantenimiento: {
+                    ...nuevoMantenimiento[0],
+                    tiene_gasto_asociado: !!gastoCreado,
+                    gasto_id: gastoCreado?.id || null,
+                    gasto_total: gastoCreado?.total || null
+                }
+            };
+            
+            if (gastoCreado) {
+                response.gasto_creado = gastoCreado;
+            }
+            
+            res.status(201).json(response);
+            
+        } catch (transactionError) {
+            throw transactionError;
         }
-        
-        // Obtener el mantenimiento creado
-        const [nuevoMantenimiento] = await pool.execute(
-            'SELECT * FROM mantenimientos WHERE id = ?', 
-            [result.insertId]
-        );
-        
-        console.log(`✅ Mantenimiento creado: ID ${result.insertId} para camión ${camionId}`);
-        res.status(201).json({
-            message: 'Mantenimiento registrado exitosamente',
-            mantenimiento: nuevoMantenimiento[0]
-        });
         
     } catch (error) {
         console.error('❌ Error creando mantenimiento:', error);
@@ -161,13 +208,18 @@ exports.createMantenimiento = async (req, res) => {
     }
 };
 
-// ✅ OBTENER TODOS LOS MANTENIMIENTOS
+// ✅ OBTENER TODOS LOS MANTENIMIENTOS - CORREGIDO
 exports.getAllMantenimientos = async (req, res) => {
     try {
         const { limit = 20, offset = 0, tipo, desde, hasta } = req.query;
         
+        // ✅ FIX: Simplificar la consulta eliminando el LEFT JOIN problemático
         let query = `
-            SELECT m.*, c.patente, c.marca, c.modelo
+            SELECT 
+                m.*, 
+                c.patente, 
+                c.marca, 
+                c.modelo
             FROM mantenimientos m
             JOIN camiones c ON m.camion_id = c.id
             WHERE 1=1
@@ -191,7 +243,12 @@ exports.getAllMantenimientos = async (req, res) => {
         }
         
         query += ' ORDER BY m.fecha DESC, m.fecha_creacion DESC LIMIT ? OFFSET ?';
-        params.push(parseInt(limit), parseInt(offset));
+        
+        // ✅ FIX: Convertir parámetros numéricos a string
+        params.push(String(limit), String(offset));
+        
+        console.log('🔍 Ejecutando consulta:', query);
+        console.log('🔍 Con parámetros:', params);
         
         const [mantenimientos] = await pool.execute(query, params);
         
@@ -229,6 +286,7 @@ exports.getAllMantenimientos = async (req, res) => {
         
     } catch (error) {
         console.error('❌ Error obteniendo todos los mantenimientos:', error);
+        console.error('❌ Stack completo:', error);
         res.status(500).json({ 
             message: 'Error interno del servidor',
             error: process.env.NODE_ENV === 'development' ? error.message : undefined
@@ -236,20 +294,25 @@ exports.getAllMantenimientos = async (req, res) => {
     }
 };
 
-// ✅ OBTENER PRÓXIMOS MANTENIMIENTOS (ALERTAS)
+// ✅ OBTENER PRÓXIMOS MANTENIMIENTOS (ALERTAS) - CORREGIDO
 exports.getProximosMantenimientos = async (req, res) => {
     try {
+        // ✅ FIX: Simplificar la consulta y usar CAST para asegurar tipos correctos
         const query = `
             SELECT 
                 c.id as camion_id,
                 c.patente,
                 c.marca,
                 c.modelo,
-                c.kilometros as km_actual,
+                CAST(c.kilometros as SIGNED) as km_actual,
                 m.proximo_service_km,
                 m.fecha as ultimo_mantenimiento,
                 m.tipo as ultimo_tipo,
-                (m.proximo_service_km - c.kilometros) as km_restantes,
+                CASE 
+                    WHEN m.proximo_service_km IS NOT NULL 
+                    THEN CAST((m.proximo_service_km - c.kilometros) as SIGNED)
+                    ELSE NULL 
+                END as km_restantes,
                 CASE 
                     WHEN m.proximo_service_km IS NOT NULL AND (m.proximo_service_km - c.kilometros) <= 1000 THEN 'URGENTE'
                     WHEN m.proximo_service_km IS NOT NULL AND (m.proximo_service_km - c.kilometros) <= 3000 THEN 'PRÓXIMO'
@@ -266,6 +329,7 @@ exports.getProximosMantenimientos = async (req, res) => {
                     proximo_service_km,
                     ROW_NUMBER() OVER (PARTITION BY camion_id ORDER BY fecha DESC) as rn
                 FROM mantenimientos
+                WHERE proximo_service_km IS NOT NULL OR fecha >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)
             ) m ON c.id = m.camion_id AND m.rn = 1
             WHERE c.activo = 1
             HAVING prioridad IN ('URGENTE', 'PRÓXIMO', 'VENCIDO')
@@ -278,7 +342,7 @@ exports.getProximosMantenimientos = async (req, res) => {
                 km_restantes ASC
         `;
         
-        const [alertas] = await pool.execute(query);
+        const [alertas] = await pool.execute(query, []);
         
         console.log(`✅ Obtenidas ${alertas.length} alertas de mantenimiento`);
         res.json(alertas);
@@ -404,7 +468,7 @@ exports.deleteMantenimiento = async (req, res) => {
     }
 };
 
-// ✅ OBTENER ESTADÍSTICAS DE MANTENIMIENTOS
+// ✅ OBTENER ESTADÍSTICAS DE MANTENIMIENTOS - CORREGIDO
 exports.getEstadisticasMantenimientos = async (req, res) => {
     try {
         const [stats] = await pool.execute(`
@@ -443,6 +507,78 @@ exports.getEstadisticasMantenimientos = async (req, res) => {
         
     } catch (error) {
         console.error('❌ Error obteniendo estadísticas de mantenimientos:', error);
+        res.status(500).json({ 
+            message: 'Error interno del servidor',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+};
+
+// ✅ NUEVA FUNCIÓN: CREAR GASTO MANUAL DESDE MANTENIMIENTO
+exports.crearGastoDesdeMantenimiento = async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        // Obtener el mantenimiento
+        const [mantenimiento] = await pool.execute(
+            'SELECT * FROM mantenimientos WHERE id = ?', 
+            [id]
+        );
+        
+        if (mantenimiento.length === 0) {
+            return res.status(404).json({ message: 'Mantenimiento no encontrado' });
+        }
+        
+        const m = mantenimiento[0];
+        
+        // Verificar que tenga costo
+        if (!m.costo || m.costo <= 0) {
+            return res.status(400).json({ 
+                message: 'El mantenimiento no tiene costo para registrar como gasto' 
+            });
+        }
+        
+        // Verificar que no tenga gasto asociado ya
+        const [gastoExistente] = await pool.execute(`
+            SELECT id FROM gastos 
+            WHERE nombre LIKE CONCAT('Mantenimiento - ', ?)
+                AND camion_id = ?
+                AND DATE(fecha) = DATE(?)
+        `, [m.tipo, m.camion_id, m.fecha]);
+        
+        if (gastoExistente.length > 0) {
+            return res.status(400).json({ 
+                message: 'Ya existe un gasto asociado a este mantenimiento',
+                gasto_id: gastoExistente[0].id
+            });
+        }
+        
+        // Crear el gasto
+        const gastoResult = await createGastoFromMantenimiento({
+            camion_id: m.camion_id,
+            fecha: m.fecha,
+            tipo: m.tipo,
+            descripcion: m.descripcion,
+            costo: m.costo,
+            kilometraje: m.kilometraje
+        });
+        
+        if (gastoResult.success) {
+            console.log(`✅ Gasto creado manualmente desde mantenimiento: ID ${gastoResult.gastoId}`);
+            res.json({
+                message: 'Gasto creado exitosamente desde mantenimiento',
+                gasto_id: gastoResult.gastoId,
+                gasto_total: m.costo
+            });
+        } else {
+            res.status(500).json({
+                message: gastoResult.message,
+                error: gastoResult.error
+            });
+        }
+        
+    } catch (error) {
+        console.error('❌ Error creando gasto desde mantenimiento:', error);
         res.status(500).json({ 
             message: 'Error interno del servidor',
             error: process.env.NODE_ENV === 'development' ? error.message : undefined
