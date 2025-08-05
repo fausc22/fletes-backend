@@ -173,7 +173,7 @@ exports.getGastos = async (req, res) => {
         `;
         const params = [];
         
-        // Filtros opcionales (mismo código que ingresos, cambiando 'i' por 'g')
+        // Filtros opcionales
         if (camion_id) {
             query += ' AND g.camion_id = ?';
             params.push(camion_id);
@@ -200,12 +200,16 @@ exports.getGastos = async (req, res) => {
         }
         
         query += ' ORDER BY g.fecha DESC, g.fecha_creacion DESC LIMIT ? OFFSET ?';
-        params.push(parseInt(limit), parseInt(offset));
         
-        // ✅ USAR db.execute
-        const [gastos] = await db.execute(query, params);
+        // ✅ FIX CRÍTICO: Convertir limit y offset a STRING como en mantenimientos
+        params.push(String(limit), String(offset));
         
-        // Count query igual que ingresos pero con 'g'
+        console.log('🔍 Query gastos:', query);
+        console.log('🔍 Params gastos:', params);
+        
+        const [gastos] = await pool.execute(query, params);
+        
+        // Count query para paginación
         let countQuery = `SELECT COUNT(*) as total FROM gastos g WHERE 1=1`;
         const countParams = [];
         
@@ -230,7 +234,7 @@ exports.getGastos = async (req, res) => {
             countParams.push(año, mes);
         }
         
-        const [totalResult] = await db.execute(countQuery, countParams);
+        const [totalResult] = await pool.execute(countQuery, countParams);
         
         console.log(`✅ Obtenidos ${gastos.length} gastos`);
         res.json({
@@ -372,8 +376,6 @@ exports.createIngreso = async (req, res) => {
 };
 
 // ✅ OBTENER INGRESOS CON FILTROS
-
-
 exports.getIngresos = async (req, res) => {
     try {
         const { 
@@ -425,10 +427,14 @@ exports.getIngresos = async (req, res) => {
         }
         
         query += ' ORDER BY i.fecha DESC, i.fecha_creacion DESC LIMIT ? OFFSET ?';
-        params.push(parseInt(limit), parseInt(offset));
         
-        // ✅ USAR db.execute que funciona mejor para estos casos
-        const [ingresos] = await db.execute(query, params);
+        // ✅ FIX CRÍTICO: Convertir limit y offset a STRING como en mantenimientos
+        params.push(String(limit), String(offset));
+        
+        console.log('🔍 Query ingresos:', query);
+        console.log('🔍 Params ingresos:', params);
+        
+        const [ingresos] = await pool.execute(query, params);
         
         // Obtener total para paginación
         let countQuery = `SELECT COUNT(*) as total FROM ingresos i WHERE 1=1`;
@@ -455,7 +461,7 @@ exports.getIngresos = async (req, res) => {
             countParams.push(año, mes);
         }
         
-        const [totalResult] = await db.execute(countQuery, countParams);
+        const [totalResult] = await pool.execute(countQuery, countParams);
         
         console.log(`✅ Obtenidos ${ingresos.length} ingresos`);
         res.json({
