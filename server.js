@@ -1,3 +1,4 @@
+// server.js - ACTUALIZADO PARA INCLUIR RUTAS DE VIAJES
 require('dotenv').config();
 
 const express = require('express');
@@ -12,7 +13,8 @@ const app = express();
 // Controladores routes
 const authRoutes = require('./routes/authRoutes');
 const camionesRoutes = require('./routes/camionesRoutes');
-const dineroRoutes = require('./routes/dineroRoutes'); // ✅ NUEVA RUTA AGREGADA
+const dineroRoutes = require('./routes/dineroRoutes');
+const viajesRoutes = require('./routes/viajesRoutes'); // ✅ NUEVA RUTA AGREGADA
 
 // CORS configuration - Optimizado para VPS
 const allowedOrigins = [
@@ -112,7 +114,8 @@ app.get('/', (req, res) => {
         endpoints: {
             auth: '/auth',
             camiones: '/camiones',
-            dinero: '/dinero', // ✅ NUEVO ENDPOINT AGREGADO
+            dinero: '/dinero',
+            viajes: '/viajes', // ✅ NUEVO ENDPOINT AGREGADO
             health: '/health',
         }
     });
@@ -121,7 +124,8 @@ app.get('/', (req, res) => {
 // Routes
 app.use('/auth', authRoutes);
 app.use('/camiones', camionesRoutes);
-app.use('/dinero', dineroRoutes); // ✅ NUEVA RUTA AGREGADA
+app.use('/dinero', dineroRoutes);
+app.use('/viajes', viajesRoutes); // ✅ NUEVA RUTA AGREGADA
 
 // Middleware para rutas no encontradas
 app.use('*', (req, res) => {
@@ -141,7 +145,7 @@ app.use('*', (req, res) => {
             'DELETE /camiones/:id',
             'GET /camiones/:camionId/mantenimientos',
             'POST /camiones/:camionId/mantenimientos',
-            // ✅ NUEVOS ENDPOINTS AGREGADOS
+            // ✅ ENDPOINTS DE DINERO
             'GET /dinero/gastos',
             'POST /dinero/gastos',
             'PUT /dinero/gastos/:id',
@@ -153,7 +157,22 @@ app.use('*', (req, res) => {
             'GET /dinero/movimientos',
             'GET /dinero/resumen-mensual',
             'GET /dinero/estadisticas',
-            'GET /dinero/categorias'
+            'GET /dinero/categorias',
+            // ✅ NUEVOS ENDPOINTS DE VIAJES
+            'GET /viajes',
+            'POST /viajes',
+            'GET /viajes/:id',
+            'PUT /viajes/:id/finalizar',
+            'PUT /viajes/:id/cancelar',
+            'GET /viajes/activos',
+            'GET /viajes/estadisticas',
+            'GET /viajes/rutas',
+            'POST /viajes/rutas',
+            'GET /viajes/rutas/:id',
+            'PUT /viajes/rutas/:id',
+            'DELETE /viajes/rutas/:id',
+            'GET /viajes/rutas/rentables',
+            'GET /viajes/rutas/estadisticas'
         ]
     });
 });
@@ -220,5 +239,6 @@ const server = app.listen(port, '0.0.0.0', () => {
     console.log(`   - Arquitectura: ${process.arch}`);
     console.log(`   - PID: ${process.pid}`);
     console.log(`   - 🚛 Módulo Camiones: ACTIVO`);
-    console.log(`   - 💰 Módulo Dinero: ACTIVO`); // ✅ NUEVO LOG
+    console.log(`   - 💰 Módulo Dinero: ACTIVO`);
+    console.log(`   - 🗺️ Módulo Viajes: ACTIVO`); // ✅ NUEVO LOG
 });
