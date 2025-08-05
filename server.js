@@ -12,7 +12,7 @@ const app = express();
 // Controladores routes
 const authRoutes = require('./routes/authRoutes');
 const camionesRoutes = require('./routes/camionesRoutes');
-const gastosRoutes = require('./routes/gastosRoutes'); // ✅ NUEVA RUTA AGREGADA
+const dineroRoutes = require('./routes/dineroRoutes'); // ✅ NUEVA RUTA AGREGADA
 
 // CORS configuration - Optimizado para VPS
 const allowedOrigins = [
@@ -112,7 +112,7 @@ app.get('/', (req, res) => {
         endpoints: {
             auth: '/auth',
             camiones: '/camiones',
-            gastos: '/gastos', // ✅ NUEVO ENDPOINT AGREGADO
+            dinero: '/dinero', // ✅ NUEVO ENDPOINT AGREGADO
             health: '/health',
         }
     });
@@ -121,7 +121,7 @@ app.get('/', (req, res) => {
 // Routes
 app.use('/auth', authRoutes);
 app.use('/camiones', camionesRoutes);
-app.use('/gastos', gastosRoutes); // ✅ NUEVA RUTA AGREGADA
+app.use('/dinero', dineroRoutes); // ✅ NUEVA RUTA AGREGADA
 
 // Middleware para rutas no encontradas
 app.use('*', (req, res) => {
@@ -141,12 +141,19 @@ app.use('*', (req, res) => {
             'DELETE /camiones/:id',
             'GET /camiones/:camionId/mantenimientos',
             'POST /camiones/:camionId/mantenimientos',
-            'GET /gastos', // ✅ NUEVO ENDPOINT EN DOCUMENTACIÓN
-            'POST /gastos',
-            'PUT /gastos/:id',
-            'DELETE /gastos/:id',
-            'GET /gastos/categorias',
-            'GET /gastos/estadisticas'
+            // ✅ NUEVOS ENDPOINTS AGREGADOS
+            'GET /dinero/gastos',
+            'POST /dinero/gastos',
+            'PUT /dinero/gastos/:id',
+            'DELETE /dinero/gastos/:id',
+            'GET /dinero/ingresos',
+            'POST /dinero/ingresos',
+            'PUT /dinero/ingresos/:id',
+            'DELETE /dinero/ingresos/:id',
+            'GET /dinero/movimientos',
+            'GET /dinero/resumen-mensual',
+            'GET /dinero/estadisticas',
+            'GET /dinero/categorias'
         ]
     });
 });
@@ -213,6 +220,5 @@ const server = app.listen(port, '0.0.0.0', () => {
     console.log(`   - Arquitectura: ${process.arch}`);
     console.log(`   - PID: ${process.pid}`);
     console.log(`   - 🚛 Módulo Camiones: ACTIVO`);
-    console.log(`   - 💰 Módulo Gastos: ACTIVO`); // ✅ NUEVO LOG
-    console.log(`   - 🔧 Módulo Mantenimientos: ACTIVO`); // ✅ NUEVO LOG
+    console.log(`   - 💰 Módulo Dinero: ACTIVO`); // ✅ NUEVO LOG
 });
