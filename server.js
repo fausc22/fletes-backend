@@ -15,6 +15,7 @@ const authRoutes = require('./routes/authRoutes');
 const camionesRoutes = require('./routes/camionesRoutes');
 const dineroRoutes = require('./routes/dineroRoutes');
 const viajesRoutes = require('./routes/viajesRoutes'); // ✅ NUEVA RUTA AGREGADA
+const reportesRoutes = require('./routes/reportesRoutes');
 
 // CORS configuration - Optimizado para VPS
 const allowedOrigins = [
@@ -115,7 +116,8 @@ app.get('/', (req, res) => {
             auth: '/auth',
             camiones: '/camiones',
             dinero: '/dinero',
-            viajes: '/viajes', // ✅ NUEVO ENDPOINT AGREGADO
+            viajes: '/viajes',
+            reportes: '/reportes',
             health: '/health',
         }
     });
@@ -126,6 +128,7 @@ app.use('/auth', authRoutes);
 app.use('/camiones', camionesRoutes);
 app.use('/dinero', dineroRoutes);
 app.use('/viajes', viajesRoutes); // ✅ NUEVA RUTA AGREGADA
+app.use('/reportes', reportesRoutes);
 
 // Middleware para rutas no encontradas
 app.use('*', (req, res) => {
@@ -172,7 +175,11 @@ app.use('*', (req, res) => {
             'PUT /viajes/rutas/:id',
             'DELETE /viajes/rutas/:id',
             'GET /viajes/rutas/rentables',
-            'GET /viajes/rutas/estadisticas'
+            'GET /viajes/rutas/estadisticas',
+            'GET /reportes/dashboard',
+            'GET /reportes/por-camion',
+            'GET /reportes/rutas',
+            'GET /reportes/mensual'
         ]
     });
 });
