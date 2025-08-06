@@ -1,9 +1,9 @@
 // routes/camionesRoutes.js - SISTEMA DE FLETES - RUTAS CORREGIDAS
 const express = require('express');
 const router = express.Router();
-const camionesController = require('../controllers/camionesController');
-const mantenimientosController = require('../controllers/mantenimientosController');
-const { requireAuth } = require('../middlewares/authMiddleware');
+const camionesController = require('../../controllers/fletes/camionesController');
+const mantenimientosController = require('../../controllers/fletes/mantenimientosController');
+const { requireAuth } = require('../../middlewares/fletes/authMiddleware');
 
 // ===== RUTAS DE CAMIONES =====
 

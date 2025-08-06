@@ -11,11 +11,11 @@ const port = process.env.PORT || 3001;
 const app = express();
 
 // Controladores routes
-const authRoutes = require('./routes/authRoutes');
-const camionesRoutes = require('./routes/camionesRoutes');
-const dineroRoutes = require('./routes/dineroRoutes');
-const viajesRoutes = require('./routes/viajesRoutes'); // ✅ NUEVA RUTA AGREGADA
-const reportesRoutes = require('./routes/reportesRoutes');
+const authRoutesFletes = require('./routes/fletes/authRoutes');
+const camionesRoutesFletes = require('./routes/fletes/camionesRoutes');
+const dineroRoutesFletes = require('./routes/fletes/dineroRoutes');
+const viajesRoutesFletes = require('./routes/fletes/viajesRoutes'); // ✅ NUEVA RUTA AGREGADA
+const reportesRoutesFletes = require('./routes/fletes/reportesRoutes');
 
 // CORS configuration - Optimizado para VPS
 const allowedOrigins = [
@@ -68,7 +68,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.get('/health', async (req, res) => {
     try {
         // Test básico de conexión a BD
-        const db = require('./controllers/dbPromise');
+        const db = require('./controllers/fletes/dbPromise');
         const startTime = Date.now();
         await db.execute('SELECT 1');
         const dbResponseTime = Date.now() - startTime;
@@ -124,11 +124,11 @@ app.get('/', (req, res) => {
 });
 
 // Routes
-app.use('/auth', authRoutes);
-app.use('/camiones', camionesRoutes);
-app.use('/dinero', dineroRoutes);
-app.use('/viajes', viajesRoutes); // ✅ NUEVA RUTA AGREGADA
-app.use('/reportes', reportesRoutes);
+app.use('/authFletes', authRoutesFletes);
+app.use('/camiones', camionesRoutesFletes);
+app.use('/dinero', dineroRoutesFletes);
+app.use('/viajes', viajesRoutesFletes); 
+app.use('/reportes', reportesRoutesFletes);
 
 // Middleware para rutas no encontradas
 app.use('*', (req, res) => {
@@ -204,7 +204,7 @@ const gracefulShutdown = async (signal) => {
     
     try {
         // Cerrar conexiones de base de datos
-        const db = require('./controllers/dbPromise');
+        const db = require('./controllers/fletes/dbPromise');
         await db.end();
         
         console.log('✅ Servidor VPS cerrado correctamente');

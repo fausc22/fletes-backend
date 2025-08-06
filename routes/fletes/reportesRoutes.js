@@ -1,8 +1,8 @@
 // routes/reportesRoutes.js - SISTEMA DE FLETES
 const express = require('express');
 const router = express.Router();
-const reportesController = require('../controllers/reportesController');
-const { requireAuth } = require('../middlewares/authMiddleware');
+const reportesController = require('../../controllers/fletes/reportesController');
+const { requireAuth } = require('../../middlewares/fletes/authMiddleware');
 
 // ✅ OBTENER DASHBOARD PRINCIPAL DE REPORTES
 // GET /api/reportes/dashboard?año=2024&mes=8

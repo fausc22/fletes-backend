@@ -1,8 +1,8 @@
 // routes/dineroRoutes.js - SISTEMA DE FLETES
 const express = require('express');
 const router = express.Router();
-const dineroController = require('../controllers/dineroController');
-const { requireAuth } = require('../middlewares/authMiddleware');
+const dineroController = require('../../controllers/fletes/dineroController');
+const { requireAuth } = require('../../middlewares/fletes/authMiddleware');
 
 // ===== RUTAS DE GASTOS =====
 

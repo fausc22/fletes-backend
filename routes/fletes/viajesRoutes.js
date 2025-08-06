@@ -1,9 +1,9 @@
 // routes/viajesRoutes.js - ORDEN CORREGIDO
 const express = require('express');
 const router = express.Router();
-const viajesController = require('../controllers/viajesController');
-const rutasController = require('../controllers/rutasController');
-const { requireAuth } = require('../middlewares/authMiddleware');
+const viajesController = require('../../controllers/fletes/viajesController');
+const rutasController = require('../../controllers/fletes/rutasController');
+const { requireAuth } = require('../../middlewares/fletes/authMiddleware');
 
 // ✅ RUTAS ESPECÍFICAS PRIMERO (antes de :id)
 router.get('/estadisticas', requireAuth, viajesController.getEstadisticasViajes);

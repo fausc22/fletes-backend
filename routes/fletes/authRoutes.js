@@ -1,8 +1,8 @@
 // routes/authRoutes.js - ADAPTADO PARA SISTEMA DE FLETES
 const express = require('express');
 const router = express.Router();
-const authController = require('../controllers/authController');
-const { authenticateToken, debugToken, requireAuth } = require('../middlewares/authMiddleware');
+const authController = require('../../controllers/fletes/authController');
+const { authenticateToken, debugToken, requireAuth } = require('../../middlewares/fletes/authMiddleware');
 
 // ✅ RUTAS PÚBLICAS - No requieren autenticación
 router.post('/login', authController.login);

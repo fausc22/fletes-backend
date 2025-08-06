@@ -297,17 +297,20 @@ exports.getReporteRutas = async (req, res) => {
 };
 
 // ✅ OBTENER REPORTE MENSUAL COMPARATIVO
+
 exports.getReporteMensual = async (req, res) => {
     try {
         const { año } = req.query;
         const añoActual = año || new Date().getFullYear();
         
-        // ✅ Obtener datos de los últimos 6 meses
-        const [reporteMensual] = await pool.execute(`
+        // ✅ FIX: Separar en dos consultas para evitar el error de GROUP BY
+        
+        // CONSULTA 1: Obtener ingresos y gastos por mes
+        const [reporteFinanciero] = await pool.execute(`
             SELECT 
                 YEAR(fecha) as año,
                 MONTH(fecha) as mes,
-                MONTHNAME(fecha) as nombre_mes,
+                DATE_FORMAT(fecha, '%M') as nombre_mes,
                 
                 -- Ingresos del mes
                 COALESCE(SUM(CASE WHEN tipo_mov = 'INGRESO' THEN total END), 0) as ingresos,
@@ -315,13 +318,7 @@ exports.getReporteMensual = async (req, res) => {
                 
                 -- Gastos del mes  
                 COALESCE(SUM(CASE WHEN tipo_mov = 'GASTO' THEN total END), 0) as gastos,
-                COUNT(CASE WHEN tipo_mov = 'GASTO' THEN 1 END) as cantidad_gastos,
-                
-                -- Viajes del mes
-                (SELECT COUNT(*) FROM viajes v 
-                 WHERE YEAR(v.fecha_inicio) = YEAR(movimientos.fecha) 
-                 AND MONTH(v.fecha_inicio) = MONTH(movimientos.fecha)
-                 AND v.estado IN ('COMPLETADO', 'EN_CURSO')) as viajes
+                COUNT(CASE WHEN tipo_mov = 'GASTO' THEN 1 END) as cantidad_gastos
                 
             FROM (
                 SELECT fecha, total, 'INGRESO' as tipo_mov FROM ingresos
@@ -330,13 +327,76 @@ exports.getReporteMensual = async (req, res) => {
             ) movimientos
             WHERE YEAR(fecha) = ? 
             AND fecha >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)
-            GROUP BY YEAR(fecha), MONTH(fecha), MONTHNAME(fecha)
+            GROUP BY YEAR(fecha), MONTH(fecha), DATE_FORMAT(fecha, '%M')
             ORDER BY año DESC, mes DESC
             LIMIT 6
         `, [añoActual]);
         
+        // CONSULTA 2: Obtener viajes por mes/año
+        const [reporteViajes] = await pool.execute(`
+            SELECT 
+                YEAR(fecha_inicio) as año,
+                MONTH(fecha_inicio) as mes,
+                COUNT(*) as viajes
+            FROM viajes v
+            WHERE YEAR(fecha_inicio) = ?
+            AND fecha_inicio >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)
+            AND estado IN ('COMPLETADO', 'EN_CURSO')
+            GROUP BY YEAR(fecha_inicio), MONTH(fecha_inicio)
+            ORDER BY año DESC, mes DESC
+        `, [añoActual]);
+        
+        // ✅ COMBINAR RESULTADOS EN MEMORIA
+        const mesesMap = new Map();
+        
+        // Procesar datos financieros
+        reporteFinanciero.forEach(mes => {
+            const key = `${mes.año}-${mes.mes}`;
+            mesesMap.set(key, {
+                año: mes.año,
+                mes: mes.mes,
+                nombre_mes: mes.nombre_mes,
+                ingresos: mes.ingresos,
+                gastos: mes.gastos,
+                cantidad_ingresos: mes.cantidad_ingresos,
+                cantidad_gastos: mes.cantidad_gastos,
+                viajes: 0 // Default
+            });
+        });
+        
+        // Agregar datos de viajes
+        reporteViajes.forEach(viaje => {
+            const key = `${viaje.año}-${viaje.mes}`;
+            if (mesesMap.has(key)) {
+                const mesData = mesesMap.get(key);
+                mesData.viajes = viaje.viajes;
+            } else {
+                // Si hay viajes pero no movimientos financieros
+                const nombreMes = new Date(viaje.año, viaje.mes - 1, 1).toLocaleDateString('es-ES', { month: 'long' });
+                mesesMap.set(key, {
+                    año: viaje.año,
+                    mes: viaje.mes,
+                    nombre_mes: nombreMes.charAt(0).toUpperCase() + nombreMes.slice(1),
+                    ingresos: 0,
+                    gastos: 0,
+                    cantidad_ingresos: 0,
+                    cantidad_gastos: 0,
+                    viajes: viaje.viajes
+                });
+            }
+        });
+        
+        // ✅ Convertir Map a Array y ordenar
+        const mesesArray = Array.from(mesesMap.values())
+            .sort((a, b) => {
+                if (a.año !== b.año) return b.año - a.año;
+                return b.mes - a.mes;
+            })
+            .slice(0, 6)
+            .reverse(); // Para mostrar cronológicamente
+        
         // ✅ Formatear datos para el gráfico
-        const mesesFormateados = reporteMensual.reverse().map(mes => {
+        const mesesFormateados = mesesArray.map(mes => {
             const balance = mes.ingresos - mes.gastos;
             const margen = mes.ingresos > 0 ? Math.round((balance / mes.ingresos) * 100) : 0;
             
@@ -358,45 +418,52 @@ exports.getReporteMensual = async (req, res) => {
             };
         });
         
-        // ✅ Calcular tendencias
-        const mesActual = mesesFormateados[mesesFormateados.length - 1];
-        const mesAnterior = mesesFormateados[mesesFormateados.length - 2];
-        
+        // ✅ Calcular tendencias solo si hay datos suficientes
         let tendencia = {
             ingresos: 0,
             gastos: 0,
             viajes: 0
         };
         
-        if (mesAnterior && mesActual) {
-            tendencia = {
-                ingresos: mesAnterior.ingresos > 0 
-                    ? Math.round(((mesActual.ingresos - mesAnterior.ingresos) / mesAnterior.ingresos) * 100)
-                    : 0,
-                gastos: mesAnterior.gastos > 0
-                    ? Math.round(((mesActual.gastos - mesAnterior.gastos) / mesAnterior.gastos) * 100)  
-                    : 0,
-                viajes: mesAnterior.viajes > 0
-                    ? Math.round(((mesActual.viajes - mesAnterior.viajes) / mesAnterior.viajes) * 100)
-                    : 0
-            };
+        if (mesesFormateados.length >= 2) {
+            const mesActual = mesesFormateados[mesesFormateados.length - 1];
+            const mesAnterior = mesesFormateados[mesesFormateados.length - 2];
+            
+            if (mesAnterior && mesActual) {
+                tendencia = {
+                    ingresos: mesAnterior.ingresos > 0 
+                        ? Math.round(((mesActual.ingresos - mesAnterior.ingresos) / mesAnterior.ingresos) * 100)
+                        : 0,
+                    gastos: mesAnterior.gastos > 0
+                        ? Math.round(((mesActual.gastos - mesAnterior.gastos) / mesAnterior.gastos) * 100)  
+                        : 0,
+                    viajes: mesAnterior.viajes > 0
+                        ? Math.round(((mesActual.viajes - mesAnterior.viajes) / mesAnterior.viajes) * 100)
+                        : 0
+                };
+            }
         }
+        
+        // ✅ Calcular resumen
+        const resumen = {
+            mejor_mes: mesesFormateados.length > 0 
+                ? mesesFormateados.reduce((prev, current) => 
+                    prev.balance > current.balance ? prev : current
+                  )
+                : null,
+            total_ingresos_periodo: mesesFormateados.reduce((sum, mes) => sum + mes.ingresos, 0),
+            total_gastos_periodo: mesesFormateados.reduce((sum, mes) => sum + mes.gastos, 0),
+            promedio_viajes: mesesFormateados.length > 0 
+                ? Math.round(mesesFormateados.reduce((sum, mes) => sum + mes.viajes, 0) / mesesFormateados.length)
+                : 0
+        };
         
         console.log(`✅ Reporte mensual obtenido: ${mesesFormateados.length} meses`);
         res.json({
             año: parseInt(añoActual),
             meses: mesesFormateados,
             tendencia_mes_actual: tendencia,
-            resumen: {
-                mejor_mes: mesesFormateados.reduce((prev, current) => 
-                    prev.balance > current.balance ? prev : current
-                ),
-                total_ingresos_periodo: mesesFormateados.reduce((sum, mes) => sum + mes.ingresos, 0),
-                total_gastos_periodo: mesesFormateados.reduce((sum, mes) => sum + mes.gastos, 0),
-                promedio_viajes: Math.round(
-                    mesesFormateados.reduce((sum, mes) => sum + mes.viajes, 0) / mesesFormateados.length
-                )
-            }
+            resumen
         });
         
     } catch (error) {
