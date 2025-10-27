@@ -52,11 +52,11 @@ exports.createGasto = async (req, res) => {
             });
         }
 
-        if (total > 500000) {
-            return res.status(400).json({ 
-                message: 'El monto no puede superar $500,000' 
-            });
-        }
+        // if (total > 500000) {
+        //     return res.status(400).json({ 
+        //         message: 'El monto no puede superar $500,000' 
+        //     });
+        // }
         
         // Validar fecha no futura
         const fechaGasto = new Date(fecha);

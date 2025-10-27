@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 const dineroController = require('../../controllers/fletes/dineroController');
 const { requireAuth } = require('../../middlewares/fletes/authMiddleware');
-
+const pdfController = require('../../controllers/fletes/pdfController');
 // ===== RUTAS DE GASTOS =====
 
 // ✅ CREAR NUEVO GASTO
@@ -60,4 +60,6 @@ router.get('/estadisticas', requireAuth, dineroController.getEstadisticasGeneral
 // GET /api/dinero/categorias?tipo=GASTO|INGRESO
 router.get('/categorias', requireAuth, dineroController.getCategorias);
 
+
+router.get('/pdf', requireAuth, pdfController.generarPDFBalance);
 module.exports = router;
