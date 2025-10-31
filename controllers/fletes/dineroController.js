@@ -282,11 +282,6 @@ exports.createIngreso = async (req, res) => {
             });
         }
 
-        if (total > 1000000) { // Límite mayor para ingresos
-            return res.status(400).json({ 
-                message: 'El monto no puede superar $1,000,000' 
-            });
-        }
         
         // Validar fecha
         const fechaIngreso = new Date(fecha);
@@ -788,9 +783,9 @@ exports.updateIngreso = async (req, res) => {
         }
         
         // Validar monto si se proporciona
-        if (total !== undefined && (total <= 0 || total > 1000000)) {
+        if (total !== undefined && total <= 0) {
             return res.status(400).json({ 
-                message: 'El monto debe estar entre $1 y $1,000,000' 
+                message: 'El monto debe ser mayor a $0' 
             });
         }
         
