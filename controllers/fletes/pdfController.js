@@ -374,15 +374,38 @@ exports.generarPDFBalance = async (req, res) => {
     }
 
     // ===== PIE DE PÁGINA =====
-    const pages = doc.bufferedPageRange();
-    for (let i = 0; i < pages.count; i++) {
-      doc.switchToPage(i);
-      doc.fontSize(8).fillColor('#6b7280').text(
-        `Página ${i + 1} de ${pages.count} | ${new Date().toLocaleDateString('es-AR')}`,
-        0,
-        doc.page.height - 50,
-        { align: 'center', width: doc.page.width }
-      );
+    // Agregar pie de página a todas las páginas de forma segura
+    try {
+      const range = doc.bufferedPageRange();
+      if (range && range.count > 0) {
+        // Iterar desde la última página hacia atrás para evitar problemas
+        for (let i = range.count - 1; i >= 0; i--) {
+          try {
+            doc.switchToPage(i);
+            doc.fontSize(8).fillColor('#6b7280').text(
+              `Página ${i + 1} de ${range.count} | ${new Date().toLocaleDateString('es-AR')}`,
+              50,
+              doc.page.height - 50,
+              { align: 'center', width: doc.page.width - 100 }
+            );
+          } catch (switchError) {
+            console.warn(`⚠️ No se pudo agregar pie en página ${i + 1}:`, switchError.message);
+          }
+        }
+      }
+    } catch (pageError) {
+      console.warn('⚠️ No se pudo procesar pie de página:', pageError.message);
+      // Agregar pie de página simple como fallback sin intentar cambiar de página
+      try {
+        doc.fontSize(8).fillColor('#6b7280').text(
+          `Generado el ${new Date().toLocaleDateString('es-AR')}`,
+          50,
+          doc.page.height - 50,
+          { align: 'center', width: doc.page.width - 100 }
+        );
+      } catch (fallbackError) {
+        console.warn('⚠️ No se pudo agregar pie de página alternativo');
+      }
     }
 
     // Finalizar PDF
@@ -392,9 +415,16 @@ exports.generarPDFBalance = async (req, res) => {
 
   } catch (error) {
     console.error('❌ Error generando PDF:', error);
-    res.status(500).json({ 
-      message: 'Error generando PDF',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
+    
+    // Si el stream ya fue iniciado, no podemos enviar JSON
+    if (!res.headersSent) {
+      res.status(500).json({ 
+        message: 'Error generando PDF',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    } else {
+      // Si ya se enviaron headers, solo loggeamos el error
+      console.error('❌ Stream ya iniciado, no se puede enviar respuesta JSON');
+    }
   }
 };
